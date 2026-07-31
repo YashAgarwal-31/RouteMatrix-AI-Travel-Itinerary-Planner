@@ -1,7 +1,6 @@
 # 🧭 RouteMatrix – AI Travel Itinerary Planner
 
 An AI-powered travel planning application that generates personalized multi-day travel itineraries based on destination, trip duration, budget, interests, and accommodation preferences. Powered by Google's Gemini API, RouteMatrix delivers intelligent, location-aware travel recommendations through a clean and interactive Streamlit interface.
----
 
 ## ✨ Features
 
