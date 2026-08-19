@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class TripRequest(BaseModel):
@@ -31,6 +31,12 @@ class TripRequest(BaseModel):
     @classmethod
     def normalize_currency(cls, value: str) -> str:
         return value.strip().upper()
+
+    @model_validator(mode="after")
+    def validate_dates(self) -> "TripRequest":
+        if self.end_date < self.start_date:
+            raise ValueError("End date must be on or after the start date.")
+        return self
 
     @property
     def trip_days(self) -> int:
