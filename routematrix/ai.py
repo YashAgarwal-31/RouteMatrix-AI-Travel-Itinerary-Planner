@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 
 from google import genai
 from google.genai import types
@@ -66,6 +67,34 @@ Return a complete replacement itinerary using the same structured schema. Preser
 """
 
 
+def validate_plan_against_request(plan: TripPlan, request: TripRequest) -> TripPlan:
+    if len(plan.days) != request.trip_days:
+        raise RuntimeError(f"Gemini returned {len(plan.days)} days for a {request.trip_days}-day request.")
+
+    expected_numbers = list(range(1, request.trip_days + 1))
+    actual_numbers = [day.day for day in plan.days]
+    if actual_numbers != expected_numbers:
+        raise RuntimeError("Gemini returned inconsistent itinerary day numbers.")
+
+    expected_dates = [
+        (request.start_date + timedelta(days=offset)).isoformat()
+        for offset in range(request.trip_days)
+    ]
+    actual_dates = [day.date for day in plan.days]
+    if actual_dates != expected_dates:
+        raise RuntimeError("Gemini returned itinerary dates outside the requested trip range.")
+
+    if plan.currency.strip().upper() != request.currency:
+        raise RuntimeError("Gemini returned a different currency than the requested trip currency.")
+
+    requested_destination = " ".join(request.destination.lower().split())
+    returned_destination = " ".join(plan.destination.lower().split())
+    if requested_destination not in returned_destination and returned_destination not in requested_destination:
+        raise RuntimeError("Gemini returned a different destination than the requested trip.")
+
+    return plan
+
+
 class GeminiPlanner:
     def __init__(self, api_key: str, model: str) -> None:
         if not api_key:
@@ -73,7 +102,7 @@ class GeminiPlanner:
         self.client = genai.Client(api_key=api_key)
         self.model = model
 
-    def _generate_structured(self, prompt: str, expected_days: int) -> TripPlan:
+    def _generate_structured(self, prompt: str, request: TripRequest) -> TripPlan:
         response = self.client.models.generate_content(
             model=self.model,
             contents=prompt,
@@ -93,17 +122,15 @@ class GeminiPlanner:
             parsed = json.loads(response.text)
             plan = TripPlan.model_validate(parsed)
 
-        if len(plan.days) != expected_days:
-            raise RuntimeError(f"Gemini returned {len(plan.days)} days for a {expected_days}-day request.")
-        return plan
+        return validate_plan_against_request(plan, request)
 
     def generate(self, request: TripRequest) -> TripPlan:
-        return self._generate_structured(build_prompt(request), request.trip_days)
+        return self._generate_structured(build_prompt(request), request)
 
     def refine(self, request: TripRequest, current_plan: TripPlan, instruction: str) -> TripPlan:
         if len(instruction.strip()) < 3:
             raise ValueError("Describe the itinerary change you want to make.")
         return self._generate_structured(
             build_refinement_prompt(request, current_plan, instruction),
-            request.trip_days,
+            request,
         )
