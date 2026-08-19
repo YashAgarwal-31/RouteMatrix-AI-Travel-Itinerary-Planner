@@ -33,7 +33,7 @@ class TripRequest(BaseModel):
         return value.strip().upper()
 
     @model_validator(mode="after")
-    def validate_dates(self) -> "TripRequest":
+    def validate_dates(self) -> TripRequest:
         if self.end_date < self.start_date:
             raise ValueError("End date must be on or after the start date.")
         return self
