@@ -6,56 +6,62 @@
 ![Gemini](https://img.shields.io/badge/Google-Gemini_API-4285F4?logo=google&logoColor=fff)
 ![Pydantic](https://img.shields.io/badge/Pydantic-Structured_AI-E92063)
 
-RouteMatrix is a **production-oriented AI travel planning system** that turns a travel brief into a structured, budget-aware, day-by-day itinerary. It combines a Streamlit workspace, Google Gemini structured generation, persistent user accounts and saved trips, practical budget planning, map/search shortcuts, downloadable itinerary exports, and automated CI checks.
+RouteMatrix is a **production-oriented AI travel planning workspace** that turns a travel brief into a structured, budget-aware, day-by-day itinerary and then helps the traveler keep improving and managing that trip. It combines Google Gemini structured generation, authenticated saved trips, AI itinerary refinement with version history, practical budget planning, actual-expense tracking, travel search shortcuts, calendar/Markdown/JSON exports, tests, and CI.
 
-Instead of returning an unstructured wall of AI text, RouteMatrix validates Gemini output against typed Pydantic models so the UI can reliably render days, activities, estimated costs, recommendations, transport guidance, packing lists, safety notes, and trip assumptions.
+Instead of returning an unstructured wall of AI text, RouteMatrix validates Gemini output against typed Pydantic models so the application can reliably render dates, activities, estimated costs, stay/food recommendations, transport guidance, packing lists, safety notes, sustainability guidance, and trip assumptions.
 
-> **Status:** application code is deployment-ready for portfolio/demo use. Before sharing a public live URL, add `GEMINI_API_KEY` through provider secrets and complete the smoke test in [`DEPLOYMENT.md`](./DEPLOYMENT.md).
+> **Status:** application code is deployment-ready for portfolio/demo use. Before sharing a public live URL, add `GEMINI_API_KEY` through provider secrets and complete the live smoke test in [`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
 ## ✨ Product Highlights
 
 - 🔐 **User accounts** with salted `scrypt` password hashing
-- 💾 **Saved itineraries** with user-scoped SQLite persistence
+- 💾 **User-scoped saved trips** with SQLite persistence
 - 🤖 **Gemini-powered structured itinerary generation** using Pydantic schemas
-- 🗓️ **Day-by-day planning** with time slots, neighborhoods, activities, costs, map queries, and tips
+- ✨ **AI itinerary refinement** — ask RouteMatrix to lower cost, slow the pace, swap activities, or add constraints
+- 🕘 **Itinerary version history** with restore support so AI edits are reversible
+- 🗓️ **Day-by-day planning** with time slots, neighborhoods, activities, estimated costs, booking flags, map queries, and practical tips
 - 💰 **Budget-aware planning** with category breakdown and budget-fit status
+- 💳 **Actual expense tracker** with planned-vs-recorded budget visibility
 - 🏨 **Stay recommendations** by area/type without pretending to have live availability
 - 🍽️ **Food recommendations** aligned with dietary preferences
 - 🚇 **Local transport guidance** based on trip style and constraints
 - ♿ **Accessibility-aware planning** when accessibility needs are supplied
 - 🎒 **Packing, safety, local, and sustainability guidance**
 - 🗺️ **Google Maps / Hotels / Flights search shortcuts** for live verification
-- 📥 **Markdown and JSON itinerary exports**
-- ✅ **Input validation, schema validation, error states, tests, linting, and CI**
+- 📥 **Markdown, JSON, and `.ics` calendar exports**
+- ✅ **Input validation, schema validation, safe failure states, tests, linting, compile checks, and CI**
 - 🔑 **Environment / Streamlit secrets support** — no API keys in source code
 
 ## 📸 Application Preview
 
 <img width="1163" height="1353" alt="RouteMatrix application preview" src="https://github.com/user-attachments/assets/59c3b521-6be4-4cdd-afe9-7d723ccce857" />
 
-> The screenshot above is from the original RouteMatrix prototype. The current codebase has been restructured into a full application architecture with authentication, persistence, structured AI output, exports, tests, and deployment support.
+> The screenshot above is from the original RouteMatrix prototype. The current codebase has been rebuilt into a modular application with authentication, persistent saved trips, structured AI output, itinerary refinement/versioning, expense tracking, exports, tests, CI, and deployment support. A fresh production screenshot should replace this after deployment.
 
 ## 🧠 How It Works
 
-1. A user creates an account or signs in.
+1. A traveler creates an account or signs in.
 2. The planner collects destination, dates, travelers, budget, currency, pace, interests, accommodation, food preferences, transport preferences, accessibility needs, and custom notes.
-3. RouteMatrix builds a guarded travel-planning prompt.
-4. Gemini generates a response constrained to the `TripPlan` Pydantic schema.
-5. RouteMatrix validates and renders the itinerary into separate day, budget, stay/food, travel-note, and export views.
-6. The itinerary is saved to the authenticated user's trip history.
-7. Users can reopen, export, or delete saved plans and use external live-search shortcuts before booking.
+3. RouteMatrix builds a guarded travel-planning prompt while treating user text as preferences rather than privileged system instructions.
+4. Gemini generates a response constrained to the typed `TripPlan` Pydantic schema.
+5. RouteMatrix validates the response and renders day-by-day planning, budget, stay/food, travel notes, and export views.
+6. The itinerary is saved to the authenticated user's trip history as revision 1.
+7. The traveler can request natural-language AI refinements; every accepted update becomes a new reversible itinerary revision.
+8. The traveler can track real expenses against the planned budget, reopen trips, export them to Markdown/JSON/calendar, or use external live-search shortcuts before booking.
 
 ## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
-    U[Traveler] --> UI[Streamlit UI]
+    U[Traveler] --> UI[Streamlit Workspace]
     UI --> AUTH[Auth + Session State]
-    UI --> AI[Gemini Planner Service]
+    UI --> AI[Gemini Planner / Refiner]
     AI --> G[Google Gemini API]
     AI --> SCHEMA[Pydantic TripPlan Schema]
-    UI --> DB[(SQLite Trip Store)]
-    UI --> EXP[Markdown / JSON Export]
+    UI --> DB[(SQLite)]
+    DB --> TRIPS[Trips + Revisions]
+    DB --> EXPENSES[Expense Tracker]
+    UI --> EXPORT[Markdown / JSON / ICS]
     UI --> LINKS[Maps / Hotels / Flights Search]
 ```
 
@@ -65,11 +71,11 @@ flowchart LR
 .
 ├── app.py
 ├── routematrix/
-│   ├── ai.py             # Gemini structured-generation service
-│   ├── auth.py           # scrypt password hashing
+│   ├── ai.py             # Gemini generation + refinement service
+│   ├── auth.py           # salted scrypt password hashing
 │   ├── config.py         # environment / Streamlit secrets
-│   ├── database.py       # user + trip persistence
-│   ├── exporters.py      # Markdown / JSON export utilities
+│   ├── database.py       # users, trips, revisions, expenses
+│   ├── exporters.py      # Markdown / JSON / ICS export utilities
 │   ├── models.py         # Pydantic request / itinerary schemas
 │   └── ui.py             # reusable Streamlit UI/rendering
 ├── tests/
@@ -100,9 +106,9 @@ RouteMatrix can plan around:
 
 A single generated trip is capped by `MAX_TRIP_DAYS` (21 by default) to keep AI output focused and reviewable.
 
-## 🤖 Structured AI Output
+## 🤖 Structured AI Planning
 
-The AI returns a typed `TripPlan` containing:
+Gemini returns a typed `TripPlan` containing:
 
 - Trip title and overview
 - Estimated total cost and budget-fit classification
@@ -118,7 +124,47 @@ The AI returns a typed `TripPlan` containing:
 - Sustainability suggestions
 - Assumptions and live-data disclaimer
 
-RouteMatrix intentionally does **not** claim real-time prices, weather, visa approval, opening hours, or availability. Users are directed to verify live data before booking.
+The generation path verifies that the model returns exactly the requested number of trip days before the plan is persisted.
+
+## ✨ AI Refinement & Versioning
+
+Saved trips are not one-shot outputs. A traveler can ask RouteMatrix to make changes such as:
+
+- “Make Day 2 less rushed.”
+- “Keep the whole trip under 80,000 INR.”
+- “Replace nightlife with family-friendly activities.”
+- “Add vegetarian meal options throughout.”
+- “Reduce walking and make the trip senior-friendly.”
+
+Gemini receives the original trip constraints plus the current structured itinerary and must return a complete replacement `TripPlan`. Each successful refinement is stored as a new revision. Earlier versions remain available and can be restored without losing history.
+
+## 💳 Budget & Expense Tracking
+
+RouteMatrix separates **planned cost** from **actual recorded spend**:
+
+- Planned trip budget from the user's request
+- AI-estimated trip total and category breakdown
+- Actual expenses by date/category/description
+- Recorded spend and remaining budget metrics
+- User-scoped expense creation and deletion
+
+The tracker uses the itinerary currency and is meant for trip organization, not financial/accounting use.
+
+## 📥 Exports
+
+Every itinerary can be downloaded as:
+
+- **Markdown** — readable/shareable trip document
+- **JSON** — structured data for integrations or further processing
+- **ICS calendar** — itinerary activities as calendar events
+
+Activity map queries also link to Google Maps search, while destination-level shortcuts open Google Hotels and Google Flights/Travel so the traveler can verify current information externally.
+
+## ⚠️ Live Data Boundary
+
+RouteMatrix intentionally does **not** claim real-time prices, current weather, visa approval, opening hours, transport disruptions, or hotel/flight availability. AI-generated costs are estimates. Live information must be verified with the relevant provider before booking or travel.
+
+This design keeps the portfolio project technically honest while still demonstrating end-to-end AI product engineering.
 
 ## 🧰 Tech Stack
 
@@ -190,7 +236,7 @@ python -m pytest
 python -m compileall -q app.py routematrix
 ```
 
-Tests cover password hashing, authentication, user/trip persistence, model behavior, map URL generation, and itinerary exports.
+Tests cover password hashing, authentication, user isolation, trip persistence, itinerary revision/restore behavior, expense persistence, model/date validation, Gemini SDK structured-output configuration, generation/refinement prompt contracts, map URL generation, Markdown export, and ICS calendar export.
 
 ## 🔒 Security & Reliability
 
@@ -198,21 +244,22 @@ Tests cover password hashing, authentication, user/trip persistence, model behav
 - `.env`, `secrets.toml`, SQLite files, virtual environments, and caches are ignored by Git.
 - Passwords are never stored in plaintext; RouteMatrix uses salted `scrypt` hashes.
 - Database queries use parameterized SQLite statements.
-- User trip lookups are scoped by authenticated user ID.
+- Trip, revision, and expense operations are scoped by authenticated user ID.
 - Gemini output is schema-validated before rendering or persistence.
-- The AI prompt treats user text as preferences rather than privileged system instructions.
-- Generated prices and travel information are labeled as estimates/planning guidance.
+- The AI system instruction treats user text as preferences rather than privileged instructions.
+- Failed AI generation/refinement leaves the currently saved trip unchanged.
+- Generated prices and travel information are explicitly labeled as estimates/planning guidance.
 
 ## ☁️ Deployment
 
 See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for Streamlit Community Cloud setup, secrets configuration, persistence limitations, and the live smoke-test checklist.
 
-The included SQLite persistence is appropriate for local development, portfolio demos, and a single app instance. For a larger public SaaS, move authentication/persistence to a managed database and identity layer, add observability/rate limits, and perform load testing.
+The included SQLite persistence is appropriate for local development, portfolio demos, and a single app instance with persistent storage. For a larger public SaaS, move authentication/persistence to a managed database and identity layer, add observability/rate limits, external live-data providers where licensed, and perform load testing.
 
 ## 📌 Portfolio Scope
 
-RouteMatrix is designed to demonstrate practical AI engineering rather than just API calling: structured LLM output, input validation, secure secret handling, authentication, persistence, modular architecture, exports, tests, CI, and deployment-aware system design are all part of the project.
+RouteMatrix is designed to demonstrate practical AI engineering rather than just an API call. The repository includes structured LLM output, iterative AI refinement, versioned state, input validation, secret handling, authentication, persistence, expense management, exports, tests, CI, and deployment-aware system design.
 
 ---
 
-Built as a full AI travel-planning system with Python, Streamlit, Google Gemini, Pydantic, SQLite, and production-oriented engineering practices.
+Built as a full AI travel-planning workspace with Python, Streamlit, Google Gemini, Pydantic, SQLite, and production-oriented engineering practices.
