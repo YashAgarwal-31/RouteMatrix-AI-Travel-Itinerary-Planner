@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 import streamlit as st
 
@@ -121,13 +122,136 @@ def plan_new_trip() -> None:
         st.error("The itinerary could not be generated right now. Your trip was not saved. Please try again shortly.")
 
 
+def render_ai_refinement(user_id: str, trip_id: str, request: TripRequest, plan: TripPlan) -> None:
+    with st.expander("✨ Refine this itinerary with AI"):
+        st.caption("Ask RouteMatrix to slow the pace, reduce cost, replace an activity, add dietary/accessibility constraints, or reshape the trip. Every accepted update is versioned.")
+        with st.form(f"refine_trip_{trip_id}"):
+            instruction = st.text_area(
+                "What should change?",
+                placeholder="Make Day 2 more relaxed, replace nightlife with family-friendly activities, and keep the total under 80,000 INR.",
+                max_chars=1000,
+            )
+            submitted = st.form_submit_button("Refine with Gemini", type="primary", use_container_width=True)
+        if submitted:
+            if not settings.gemini_api_key:
+                st.error("Gemini is not configured for refinement.")
+                return
+            if len(instruction.strip()) < 3:
+                st.error("Describe the change you want to make.")
+                return
+            try:
+                with st.spinner("Reworking the itinerary while preserving your trip constraints…"):
+                    updated = GeminiPlanner(settings.gemini_api_key, settings.gemini_model).refine(request, plan, instruction)
+                    revision = db.update_trip_plan(
+                        user_id,
+                        trip_id,
+                        updated.model_dump(mode="json"),
+                        instruction,
+                    )
+                st.success(f"Itinerary updated as revision {revision}.")
+                st.rerun()
+            except Exception:
+                logger.exception("Itinerary refinement failed")
+                st.error("RouteMatrix could not apply that refinement. The current saved itinerary was left unchanged.")
+
+
+def render_revision_history(user_id: str, trip_id: str) -> None:
+    revisions = db.list_trip_revisions(user_id, trip_id)
+    with st.expander(f"🕘 Itinerary version history ({len(revisions)})"):
+        if not revisions:
+            st.info("No itinerary revisions are available.")
+            return
+        for revision in revisions:
+            st.caption(
+                f"Revision {revision['revision_number']} · {revision['created_at'][:19].replace('T', ' ')} UTC · {revision['instruction']}"
+            )
+        if len(revisions) > 1:
+            options = {
+                f"Revision {item['revision_number']} — {item['instruction'][:70]}": item["id"]
+                for item in revisions[1:]
+            }
+            selected = st.selectbox("Restore an earlier version", list(options.keys()), key=f"revision_select_{trip_id}")
+            if st.button("Restore selected version", key=f"restore_revision_{trip_id}", use_container_width=True):
+                restored_number = db.restore_trip_revision(user_id, trip_id, options[selected])
+                st.success(f"Earlier itinerary restored as new revision {restored_number}.")
+                st.rerun()
+
+
+def render_expense_tracker(user_id: str, trip_id: str, request: TripRequest, plan: TripPlan) -> None:
+    st.subheader("💳 Trip expense tracker")
+    expenses = db.list_expenses(user_id, trip_id)
+    spent = sum(float(item["amount"]) for item in expenses if item["currency"] == plan.currency)
+    remaining = request.budget_amount - spent
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Trip budget", f"{request.budget_amount:,.0f} {request.currency}")
+    c2.metric("Recorded spend", f"{spent:,.0f} {plan.currency}")
+    c3.metric("Budget remaining", f"{remaining:,.0f} {plan.currency}")
+
+    with st.form(f"expense_form_{trip_id}"):
+        c1, c2, c3 = st.columns([1, 1, 1])
+        expense_date = c1.date_input(
+            "Date",
+            value=max(request.start_date, min(date.today(), request.end_date)),
+            min_value=request.start_date,
+            max_value=request.end_date,
+            key=f"expense_date_{trip_id}",
+        )
+        category = c2.selectbox(
+            "Category",
+            ["Accommodation", "Food", "Transport", "Activities", "Shopping", "Flights", "Other"],
+            key=f"expense_category_{trip_id}",
+        )
+        amount = c3.number_input("Amount", min_value=0.0, step=100.0, key=f"expense_amount_{trip_id}")
+        description = st.text_input("Description", placeholder="Metro pass, museum ticket, dinner…", key=f"expense_desc_{trip_id}")
+        submitted = st.form_submit_button("Add expense", use_container_width=True)
+    if submitted:
+        try:
+            db.add_expense(
+                user_id,
+                trip_id,
+                expense_date.isoformat(),
+                category,
+                description,
+                float(amount),
+                plan.currency,
+            )
+            st.success("Expense recorded.")
+            st.rerun()
+        except ValueError as exc:
+            st.error(str(exc))
+
+    if expenses:
+        display_rows = [
+            {
+                "Date": item["expense_date"],
+                "Category": item["category"],
+                "Description": item["description"],
+                "Amount": f"{item['amount']:,.2f} {item['currency']}",
+            }
+            for item in expenses
+        ]
+        st.dataframe(display_rows, hide_index=True, use_container_width=True)
+        expense_options = {
+            f"{item['expense_date']} · {item['category']} · {item['amount']:,.0f} {item['currency']} · {item['description'][:40]}": item["id"]
+            for item in expenses
+        }
+        selected_expense = st.selectbox("Remove an expense", list(expense_options.keys()), key=f"expense_delete_select_{trip_id}")
+        if st.button("Delete selected expense", key=f"expense_delete_{trip_id}"):
+            db.delete_expense(user_id, trip_id, expense_options[selected_expense])
+            st.rerun()
+    else:
+        st.caption("No actual expenses recorded yet.")
+
+
 def saved_trips() -> None:
     hero()
-    trips = db.list_trips(st.session_state.user["id"])
+    user_id = st.session_state.user["id"]
+    trips = db.list_trips(user_id)
     trip_id = render_saved_trip_list(trips)
     if not trip_id:
         return
-    trip = db.get_trip(st.session_state.user["id"], trip_id)
+    trip = db.get_trip(user_id, trip_id)
     if not trip:
         st.error("Trip not found.")
         return
@@ -135,13 +259,19 @@ def saved_trips() -> None:
     request = TripRequest.model_validate(trip["request"])
     plan = TripPlan.model_validate(trip["plan"])
     c1, c2 = st.columns([5, 1])
-    c1.caption(f"Saved {trip['created_at'][:10]}")
+    c1.caption(f"Saved {trip['created_at'][:10]} · Last updated {trip['updated_at'][:19].replace('T', ' ')} UTC")
     if c2.button("Delete trip", type="secondary", use_container_width=True):
-        db.delete_trip(st.session_state.user["id"], trip_id)
+        db.delete_trip(user_id, trip_id)
         st.success("Trip deleted.")
         st.rerun()
+
     render_plan(request, plan)
     travel_search_links(request.destination, request.origin)
+    st.divider()
+    render_ai_refinement(user_id, trip_id, request, plan)
+    render_revision_history(user_id, trip_id)
+    st.divider()
+    render_expense_tracker(user_id, trip_id, request, plan)
 
 
 def account_page() -> None:
