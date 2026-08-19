@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta
 from urllib.parse import quote_plus
 
 from .models import TripPlan, TripRequest
@@ -62,3 +63,56 @@ def plan_to_markdown(request: TripRequest, plan: TripPlan) -> str:
 
     lines.extend(["", f"> {plan.live_data_disclaimer}"])
     return "\n".join(lines)
+
+
+def _ics_escape(value: str) -> str:
+    return (
+        value.replace("\\", "\\\\")
+        .replace(";", "\\;")
+        .replace(",", "\\,")
+        .replace("\n", "\\n")
+    )
+
+
+def _activity_datetime(day_date: str, activity_time: str) -> datetime:
+    cleaned = activity_time.strip().split("-")[0].strip()
+    for fmt in ("%H:%M", "%I:%M %p", "%I %p"):
+        try:
+            parsed_time = datetime.strptime(cleaned, fmt).time()
+            return datetime.combine(datetime.fromisoformat(day_date).date(), parsed_time)
+        except ValueError:
+            continue
+    return datetime.combine(datetime.fromisoformat(day_date).date(), datetime.min.time()).replace(hour=9)
+
+
+def plan_to_ics(plan: TripPlan) -> str:
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//RouteMatrix//AI Travel Itinerary//EN",
+        "CALSCALE:GREGORIAN",
+        f"X-WR-CALNAME:{_ics_escape(plan.trip_title)}",
+    ]
+    event_number = 0
+    for day in plan.days:
+        for activity in day.activities:
+            event_number += 1
+            start = _activity_datetime(day.date, activity.time)
+            end = start + timedelta(hours=1)
+            description = activity.description
+            if activity.tips:
+                description += " Tips: " + " | ".join(activity.tips)
+            lines.extend(
+                [
+                    "BEGIN:VEVENT",
+                    f"UID:routematrix-{day.day}-{event_number}@local",
+                    f"DTSTART:{start.strftime('%Y%m%dT%H%M%S')}",
+                    f"DTEND:{end.strftime('%Y%m%dT%H%M%S')}",
+                    f"SUMMARY:{_ics_escape(activity.name)}",
+                    f"DESCRIPTION:{_ics_escape(description)}",
+                    f"LOCATION:{_ics_escape(activity.map_query or activity.neighborhood or plan.destination)}",
+                    "END:VEVENT",
+                ]
+            )
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines) + "\r\n"
