@@ -24,9 +24,7 @@ Return only the structured response requested by the schema.
 
 def build_prompt(request: TripRequest) -> str:
     interests = ", ".join(request.interests) if request.interests else "General sightseeing, local culture, food"
-    return f"""{SYSTEM_RULES}
-
-Plan this trip:
+    return f"""Plan this trip:
 - Destination: {request.destination}
 - Origin: {request.origin or 'Not specified'}
 - Dates: {request.start_date.isoformat()} to {request.end_date.isoformat()} ({request.trip_days} days)
@@ -63,7 +61,9 @@ class GeminiPlanner:
             model=self.model,
             contents=build_prompt(request),
             config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_RULES,
                 temperature=0.35,
+                max_output_tokens=16000,
                 response_mime_type="application/json",
                 response_schema=TripPlan,
             ),
