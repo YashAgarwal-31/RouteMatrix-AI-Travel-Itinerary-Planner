@@ -6,7 +6,7 @@ from urllib.parse import quote_plus
 import pandas as pd
 import streamlit as st
 
-from .exporters import map_search_url, plan_to_json, plan_to_markdown
+from .exporters import map_search_url, plan_to_ics, plan_to_json, plan_to_markdown
 from .models import TripPlan, TripRequest
 
 
@@ -207,19 +207,27 @@ def render_plan(request: TripRequest, plan: TripPlan) -> None:
     with tabs[4]:
         markdown = plan_to_markdown(request, plan)
         json_text = plan_to_json(plan)
-        c1, c2 = st.columns(2)
+        calendar = plan_to_ics(plan)
+        c1, c2, c3 = st.columns(3)
         c1.download_button(
-            "Download Markdown itinerary",
+            "Download Markdown",
             data=markdown,
             file_name="routematrix-itinerary.md",
             mime="text/markdown",
             use_container_width=True,
         )
         c2.download_button(
-            "Download JSON itinerary",
+            "Download JSON",
             data=json_text,
             file_name="routematrix-itinerary.json",
             mime="application/json",
+            use_container_width=True,
+        )
+        c3.download_button(
+            "Add to calendar (.ics)",
+            data=calendar,
+            file_name="routematrix-itinerary.ics",
+            mime="text/calendar",
             use_container_width=True,
         )
 
