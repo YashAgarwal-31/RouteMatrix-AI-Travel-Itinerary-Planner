@@ -1,6 +1,6 @@
 from datetime import date
 
-from routematrix.exporters import map_search_url, plan_to_markdown
+from routematrix.exporters import map_search_url, plan_to_ics, plan_to_markdown
 from routematrix.models import Activity, BudgetItem, DayPlan, TripPlan, TripRequest
 
 
@@ -47,6 +47,12 @@ def test_trip_request_days_and_export():
     assert "Kyoto Highlights" in markdown
     assert "Fushimi Inari" in markdown
     assert "google.com/maps" in markdown
+
+    calendar = plan_to_ics(plan)
+    assert "BEGIN:VCALENDAR" in calendar
+    assert "SUMMARY:Fushimi Inari" in calendar
+    assert "DTSTART:20261001T090000" in calendar
+    assert calendar.endswith("END:VCALENDAR\r\n")
 
 
 def test_map_url_encodes_query():
