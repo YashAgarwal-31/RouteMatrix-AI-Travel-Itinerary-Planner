@@ -96,10 +96,25 @@ def validate_plan_against_request(plan: TripPlan, request: TripRequest) -> TripP
 
 
 class GeminiPlanner:
-    def __init__(self, api_key: str, model: str) -> None:
+    def __init__(self, api_key: str, model: str, timeout_ms: int = 60_000, max_attempts: int = 3) -> None:
         if not api_key:
             raise ValueError("GEMINI_API_KEY is not configured.")
-        self.client = genai.Client(api_key=api_key)
+        timeout_ms = max(5_000, min(int(timeout_ms), 180_000))
+        max_attempts = max(1, min(int(max_attempts), 5))
+        self.client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(
+                timeout=timeout_ms,
+                retry_options=types.HttpRetryOptions(
+                    attempts=max_attempts,
+                    initial_delay=1,
+                    max_delay=8,
+                    exp_base=2,
+                    jitter=0.25,
+                    http_status_codes=[408, 429, 500, 502, 503, 504],
+                ),
+            ),
+        )
         self.model = model
 
     def _generate_structured(self, prompt: str, request: TripRequest) -> TripPlan:

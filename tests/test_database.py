@@ -1,4 +1,7 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+
+import pytest
 
 from routematrix.database import Database
 
@@ -80,3 +83,34 @@ def test_trip_data_is_user_scoped(tmp_path):
         assert "Trip not found" in str(exc)
     else:
         raise AssertionError("Expected cross-user expense write to be rejected")
+
+
+@pytest.mark.parametrize("email", ["missing-at.example.com", "missing-domain@", "missing-dot@example", "a b@example.com"])
+def test_account_rejects_malformed_email(tmp_path, email):
+    db = Database(str(tmp_path / "users.db"))
+    with pytest.raises(ValueError, match="valid email"):
+        db.create_user("Yash", email, "StrongPass123")
+
+
+def test_concurrent_refinements_receive_unique_revision_numbers(tmp_path):
+    db = Database(str(tmp_path / "concurrent.db"))
+    user = db.create_user("Yash", "yash@example.com", "StrongPass123")
+    trip_id = db.save_trip(
+        user["id"],
+        {"destination": "Tokyo", "start_date": "2026-09-01", "end_date": "2026-09-02"},
+        {"trip_title": "Tokyo", "destination": "Tokyo"},
+    )
+
+    def refine(number):
+        return db.update_trip_plan(
+            user["id"],
+            trip_id,
+            {"trip_title": f"Tokyo revision {number}", "destination": "Tokyo"},
+            f"Refinement {number}",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        revisions = list(executor.map(refine, [1, 2]))
+
+    assert sorted(revisions) == [2, 3]
+    assert [item["revision_number"] for item in db.list_trip_revisions(user["id"], trip_id)] == [3, 2, 1]

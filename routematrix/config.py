@@ -16,6 +16,8 @@ class Settings:
     gemini_model: str = "gemini-2.5-flash-lite"
     database_path: str = "data/routematrix.db"
     max_trip_days: int = 21
+    gemini_timeout_ms: int = 60_000
+    gemini_max_attempts: int = 3
 
 
 def _streamlit_secret(name: str) -> str:
@@ -28,16 +30,26 @@ def _streamlit_secret(name: str) -> str:
         return ""
 
 
+def _bounded_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    raw = os.getenv(name, "").strip() or _streamlit_secret(name)
+    try:
+        value = int(raw) if raw else default
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(value, maximum))
+
+
 def get_settings() -> Settings:
     api_key = os.getenv("GEMINI_API_KEY", "").strip() or _streamlit_secret("GEMINI_API_KEY")
     model = os.getenv("GEMINI_MODEL", "").strip() or _streamlit_secret("GEMINI_MODEL") or "gemini-2.5-flash-lite"
     database_path = os.getenv("ROUTEMATRIX_DB_PATH", "").strip() or "data/routematrix.db"
-    max_trip_days = int(os.getenv("MAX_TRIP_DAYS", "21"))
     return Settings(
         gemini_api_key=api_key,
         gemini_model=model,
         database_path=database_path,
-        max_trip_days=max(1, min(max_trip_days, 30)),
+        max_trip_days=_bounded_int("MAX_TRIP_DAYS", 21, 1, 30),
+        gemini_timeout_ms=_bounded_int("GEMINI_TIMEOUT_MS", 60_000, 5_000, 180_000),
+        gemini_max_attempts=_bounded_int("GEMINI_MAX_ATTEMPTS", 3, 1, 5),
     )
 
 

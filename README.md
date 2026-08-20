@@ -32,12 +32,6 @@ Instead of returning an unstructured wall of AI text, RouteMatrix validates Gemi
 - ✅ **Input validation, schema validation, safe failure states, tests, linting, compile checks, and CI**
 - 🔑 **Environment / Streamlit secrets support** — no API keys in source code
 
-## 📸 Application Preview
-
-<img width="1163" height="1353" alt="RouteMatrix application preview" src="https://github.com/user-attachments/assets/59c3b521-6be4-4cdd-afe9-7d723ccce857" />
-
-> The screenshot above is from the original RouteMatrix prototype. The current codebase has been rebuilt into a modular application with authentication, persistent saved trips, structured AI output, itinerary refinement/versioning, expense tracking, exports, tests, CI, and deployment support. A fresh production screenshot should replace this after deployment.
-
 ## 🧠 How It Works
 
 1. A traveler creates an account or signs in.
@@ -232,11 +226,12 @@ GitHub Actions runs on `main`, feature branches, and pull requests:
 ```bash
 pip install -r requirements-dev.txt
 ruff check .
+pip-audit -r requirements.txt
 python -m pytest
 python -m compileall -q app.py routematrix
 ```
 
-Tests cover password hashing, authentication, user isolation, trip persistence, itinerary revision/restore behavior, expense persistence, model/date validation, Gemini SDK structured-output configuration, generation/refinement prompt contracts, map URL generation, Markdown export, and ICS calendar export.
+Tests cover password hashing, email validation, authentication, user isolation, trip persistence, concurrent itinerary revision numbering, revision/restore behavior, expense persistence, defensive configuration parsing, model/date validation, Gemini timeout/retry and structured-output configuration, generation/refinement contracts, map URL generation, Markdown export, and ICS calendar export.
 
 ## 🔒 Security & Reliability
 
@@ -248,6 +243,7 @@ Tests cover password hashing, authentication, user isolation, trip persistence, 
 - Gemini output is schema-validated before rendering or persistence.
 - The AI system instruction treats user text as preferences rather than privileged instructions.
 - Failed AI generation/refinement leaves the currently saved trip unchanged.
+- Gemini requests have bounded timeouts and retries for transient provider failures.
 - Generated prices and travel information are explicitly labeled as estimates/planning guidance.
 
 ## ☁️ Deployment

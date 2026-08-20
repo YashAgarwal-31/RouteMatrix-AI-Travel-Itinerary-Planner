@@ -1,10 +1,12 @@
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 from google.genai import types
 from pydantic import ValidationError
 
 from routematrix.ai import (
+    GeminiPlanner,
     SYSTEM_RULES,
     build_prompt,
     build_refinement_prompt,
@@ -95,3 +97,49 @@ def test_trip_request_rejects_reversed_dates():
             budget_amount=50000,
             currency="INR",
         )
+
+
+def test_gemini_client_receives_bounded_timeout_and_retry_configuration(monkeypatch):
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr("routematrix.ai.genai.Client", FakeClient)
+    planner = GeminiPlanner("test-key", "test-model", timeout_ms=1, max_attempts=99)
+
+    assert planner.model == "test-model"
+    assert captured["api_key"] == "test-key"
+    options = captured["http_options"]
+    assert options.timeout == 5_000
+    assert options.retry_options.attempts == 5
+    assert 429 in options.retry_options.http_status_codes
+
+
+def test_gemini_generation_validates_structured_response(monkeypatch):
+    captured = {}
+
+    def generate_content(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(text=_plan().model_dump_json())
+
+    fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    monkeypatch.setattr("routematrix.ai.genai.Client", lambda **_kwargs: fake_client)
+
+    result = GeminiPlanner("test-key", "test-model").generate(_request())
+
+    assert result.trip_title == "Paris Explorer"
+    assert captured["model"] == "test-model"
+    assert captured["config"].response_schema is TripPlan
+    assert "Paris, France" in captured["contents"]
+
+
+def test_gemini_generation_rejects_empty_response(monkeypatch):
+    fake_client = SimpleNamespace(
+        models=SimpleNamespace(generate_content=lambda **_kwargs: SimpleNamespace(text=""))
+    )
+    monkeypatch.setattr("routematrix.ai.genai.Client", lambda **_kwargs: fake_client)
+
+    with pytest.raises(RuntimeError, match="empty response"):
+        GeminiPlanner("test-key", "test-model").generate(_request())

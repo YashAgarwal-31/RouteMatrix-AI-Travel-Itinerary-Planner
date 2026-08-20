@@ -33,6 +33,15 @@ settings = get_settings()
 db = Database(settings.database_path)
 
 
+def create_planner() -> GeminiPlanner:
+    return GeminiPlanner(
+        settings.gemini_api_key,
+        settings.gemini_model,
+        timeout_ms=settings.gemini_timeout_ms,
+        max_attempts=settings.gemini_max_attempts,
+    )
+
+
 def init_session() -> None:
     defaults = {
         "user": None,
@@ -104,7 +113,7 @@ def plan_new_trip() -> None:
 
     try:
         with st.spinner("Designing a practical itinerary…"):
-            planner = GeminiPlanner(settings.gemini_api_key, settings.gemini_model)
+            planner = create_planner()
             plan = planner.generate(request)
         trip_id = db.save_trip(
             st.session_state.user["id"],
@@ -141,7 +150,7 @@ def render_ai_refinement(user_id: str, trip_id: str, request: TripRequest, plan:
                 return
             try:
                 with st.spinner("Reworking the itinerary while preserving your trip constraints…"):
-                    updated = GeminiPlanner(settings.gemini_api_key, settings.gemini_model).refine(request, plan, instruction)
+                    updated = create_planner().refine(request, plan, instruction)
                     revision = db.update_trip_plan(
                         user_id,
                         trip_id,
@@ -237,7 +246,15 @@ def render_expense_tracker(user_id: str, trip_id: str, request: TripRequest, pla
             for item in expenses
         }
         selected_expense = st.selectbox("Remove an expense", list(expense_options.keys()), key=f"expense_delete_select_{trip_id}")
-        if st.button("Delete selected expense", key=f"expense_delete_{trip_id}"):
+        confirm_expense_delete = st.checkbox(
+            "Confirm expense deletion",
+            key=f"expense_delete_confirm_{trip_id}",
+        )
+        if st.button(
+            "Delete selected expense",
+            key=f"expense_delete_{trip_id}",
+            disabled=not confirm_expense_delete,
+        ):
             db.delete_expense(user_id, trip_id, expense_options[selected_expense])
             st.rerun()
     else:
@@ -258,12 +275,21 @@ def saved_trips() -> None:
 
     request = TripRequest.model_validate(trip["request"])
     plan = TripPlan.model_validate(trip["plan"])
-    c1, c2 = st.columns([5, 1])
-    c1.caption(f"Saved {trip['created_at'][:10]} · Last updated {trip['updated_at'][:19].replace('T', ' ')} UTC")
-    if c2.button("Delete trip", type="secondary", use_container_width=True):
-        db.delete_trip(user_id, trip_id)
-        st.success("Trip deleted.")
-        st.rerun()
+    st.caption(f"Saved {trip['created_at'][:10]} · Last updated {trip['updated_at'][:19].replace('T', ' ')} UTC")
+    with st.expander("Danger zone"):
+        confirm_trip_delete = st.checkbox(
+            f'Permanently delete "{trip["title"]}" and all its revisions and expenses',
+            key=f"trip_delete_confirm_{trip_id}",
+        )
+        if st.button(
+            "Delete trip permanently",
+            type="secondary",
+            key=f"trip_delete_{trip_id}",
+            disabled=not confirm_trip_delete,
+        ):
+            db.delete_trip(user_id, trip_id)
+            st.success("Trip deleted.")
+            st.rerun()
 
     render_plan(request, plan)
     travel_search_links(request.destination, request.origin)

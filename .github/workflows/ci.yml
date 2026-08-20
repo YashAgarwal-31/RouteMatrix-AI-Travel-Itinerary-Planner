@@ -25,6 +25,8 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Lint
         run: ruff check .
+      - name: Audit dependencies
+        run: pip-audit -r requirements.txt
       - name: Tests
         run: python -m pytest
       - name: Compile

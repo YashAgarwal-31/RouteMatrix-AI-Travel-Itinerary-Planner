@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import uuid
 from contextlib import closing
@@ -17,14 +18,15 @@ def _utc_now() -> str:
 
 class Database:
     def __init__(self, path: str) -> None:
-        self.path = path
-        Path(path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+        self.path = str(Path(path).expanduser().resolve())
+        Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path, timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA busy_timeout = 10000")
         conn.execute("PRAGMA journal_mode = WAL")
         return conn
 
@@ -99,7 +101,7 @@ class Database:
         email = email.strip().lower()
         if len(name) < 2:
             raise ValueError("Name must be at least 2 characters.")
-        if "@" not in email or len(email) > 254:
+        if len(email) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
             raise ValueError("Enter a valid email address.")
         salt, password_hash = hash_password(password)
         user_id = str(uuid.uuid4())
@@ -191,6 +193,9 @@ class Database:
         plan_json = json.dumps(plan, ensure_ascii=False, default=str)
         title = str(plan.get("trip_title") or "Updated itinerary")[:160]
         with closing(self._connect()) as conn:
+            # Serialize the read-increment-write sequence so two refinements
+            # cannot allocate the same revision number.
+            conn.execute("BEGIN IMMEDIATE")
             owned = conn.execute(
                 "SELECT id FROM trips WHERE id = ? AND user_id = ?",
                 (trip_id, user_id),
