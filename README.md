@@ -12,6 +12,10 @@ Instead of returning an unstructured wall of AI text, RouteMatrix validates Gemi
 
 > **Status:** application code is deployment-ready for portfolio/demo use. Before sharing a public live URL, add `GEMINI_API_KEY` through provider secrets and complete the live smoke test in [`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
+## 📸 Application Preview
+
+![RouteMatrix AI travel planning interface](https://github.com/user-attachments/assets/59c3b521-6be4-4cdd-afe9-7d723ccce857)
+
 ## ✨ Product Highlights
 
 - 🔐 **User accounts** with salted `scrypt` password hashing
