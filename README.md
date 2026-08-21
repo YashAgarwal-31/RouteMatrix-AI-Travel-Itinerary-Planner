@@ -250,16 +250,4 @@ Tests cover password hashing, email validation, authentication, user isolation, 
 - Gemini requests have bounded timeouts and retries for transient provider failures.
 - Generated prices and travel information are explicitly labeled as estimates/planning guidance.
 
-## ☁️ Deployment
 
-See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for Streamlit Community Cloud setup, secrets configuration, persistence limitations, and the live smoke-test checklist.
-
-The included SQLite persistence is appropriate for local development, portfolio demos, and a single app instance with persistent storage. For a larger public SaaS, move authentication/persistence to a managed database and identity layer, add observability/rate limits, external live-data providers where licensed, and perform load testing.
-
-## 📌 Portfolio Scope
-
-RouteMatrix is designed to demonstrate practical AI engineering rather than just an API call. The repository includes structured LLM output, iterative AI refinement, versioned state, input validation, secret handling, authentication, persistence, expense management, exports, tests, CI, and deployment-aware system design.
-
----
-
-Built as a full AI travel-planning workspace with Python, Streamlit, Google Gemini, Pydantic, SQLite, and production-oriented engineering practices.
