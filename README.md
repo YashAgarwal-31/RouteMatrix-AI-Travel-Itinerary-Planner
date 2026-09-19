@@ -240,7 +240,7 @@ pip install -r requirements-dev.txt
 ruff check .
 pip-audit -r requirements.txt
 python -m pytest
-python scripts/live_api_smoke.py
+python -m scripts.live_api_smoke
 python -m compileall -q app.py routematrix
 ```
 
