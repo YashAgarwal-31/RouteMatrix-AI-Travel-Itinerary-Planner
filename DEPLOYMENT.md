@@ -57,7 +57,7 @@ Before sharing the live URL:
 
 ## 5. AI/live-data checks
 
-CI runs both mocked contract tests and `python scripts/live_api_smoke.py`, which performs real outbound requests to Open-Meteo and Frankfurter. Use several real destinations and confirm that:
+CI runs both mocked contract tests and `python -m scripts.live_api_smoke`, which performs real outbound requests to Open-Meteo and Frankfurter. Use several real destinations and confirm that:
 
 - The AI returns exactly the requested number of days.
 - The itinerary does not claim guaranteed current prices, hotel/flight availability, weather, visa approval, or opening hours.
