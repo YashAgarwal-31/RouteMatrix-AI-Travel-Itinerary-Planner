@@ -1,6 +1,4 @@
 from datetime import date
-from io import BytesIO
-
 import pytest
 
 from routematrix import live_data
