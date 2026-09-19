@@ -43,6 +43,10 @@ Before sharing the live URL:
 - Ask AI refinement to change a saved itinerary and confirm a new revision is created.
 - Restore an older itinerary revision and confirm the restored plan becomes a new revision.
 - Add and delete actual trip expenses and verify planned-vs-recorded totals update.
+- Confirm the **Live trip intelligence** panel shows current destination weather from Open-Meteo.
+- For a trip inside the provider forecast window, confirm trip-date forecast rows appear; for a far-future trip, confirm the app explains that the forecast is not available yet.
+- Change the FX comparison currency and confirm Frankfurter returns a positive reference rate and converted budget.
+- Temporarily block/disconnect network access and confirm live-data failures degrade to warnings without breaking the saved itinerary.
 - Open at least one activity map search and the destination hotel/flight search shortcuts.
 - Download Markdown, JSON, and `.ics` calendar exports; open the calendar file in a calendar app.
 - Reopen the trip from **My trips** after a fresh browser session.
@@ -53,13 +57,16 @@ Before sharing the live URL:
 
 ## 5. AI/live-data checks
 
-Use several real destinations and confirm that:
+CI runs both mocked contract tests and `python -m scripts.live_api_smoke`, which performs real outbound requests to Open-Meteo and Frankfurter. Use several real destinations and confirm that:
 
 - The AI returns exactly the requested number of days.
 - The itinerary does not claim guaranteed current prices, hotel/flight availability, weather, visa approval, or opening hours.
 - Dietary/accessibility constraints are reflected throughout the plan when supplied.
 - Refinement preserves the original destination/dates/traveler/budget context while applying the requested change.
 - Map queries are useful enough to resolve the intended activity through an external map search.
+- Current weather shows a plausible temperature, humidity, wind speed, condition label, matched destination, and observation time.
+- Forecast rows only claim coverage for dates actually returned by the weather provider.
+- FX results show the provider's latest reference date and are presented as reference rates, not guaranteed card/cash settlement rates.
 
 ## 6. Security checklist
 

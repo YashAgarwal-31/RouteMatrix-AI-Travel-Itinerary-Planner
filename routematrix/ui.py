@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from .exporters import map_search_url, plan_to_ics, plan_to_json, plan_to_markdown
+from .live_data import LiveDataError, fetch_exchange_rate, fetch_weather_snapshot, weather_code_label
 from .models import TripPlan, TripRequest
 
 
@@ -127,6 +128,107 @@ def _budget_chart(plan: TripPlan) -> None:
     st.bar_chart(df.set_index("Category"), use_container_width=True)
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def _cached_weather(destination: str, start_date: str, end_date: str):
+    return fetch_weather_snapshot(
+        destination,
+        date.fromisoformat(start_date),
+        date.fromisoformat(end_date),
+    )
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _cached_exchange_rate(base: str, quote_currency: str):
+    return fetch_exchange_rate(base, quote_currency)
+
+
+def render_live_trip_data(request: TripRequest) -> None:
+    with st.expander("🌐 Live trip intelligence", expanded=True):
+        st.caption(
+            "Current weather and forecast data are fetched from Open-Meteo. "
+            "Exchange rates are fetched from Frankfurter using central-bank/official-source data."
+        )
+
+        st.markdown("#### Destination weather")
+        try:
+            weather = _cached_weather(
+                request.destination,
+                request.start_date.isoformat(),
+                request.end_date.isoformat(),
+            )
+            location_label = weather.location.name
+            if weather.location.country:
+                location_label += f", {weather.location.country}"
+            st.caption(
+                f"Live location match: {location_label} · observed {weather.current.observed_at} "
+                f"({weather.location.timezone or 'local destination time'})"
+            )
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Temperature", f"{weather.current.temperature_c:.1f} °C")
+            c2.metric("Feels like", f"{weather.current.apparent_temperature_c:.1f} °C")
+            c3.metric("Humidity", f"{weather.current.humidity_percent}%")
+            c4.metric("Wind", f"{weather.current.wind_speed_kmh:.1f} km/h")
+            st.write(f"**Current conditions:** {weather_code_label(weather.current.weather_code)}")
+
+            if weather.forecast:
+                rows = [
+                    {
+                        "Date": item.date,
+                        "Conditions": weather_code_label(item.weather_code),
+                        "High °C": item.temperature_max_c,
+                        "Low °C": item.temperature_min_c,
+                        "Rain %": item.precipitation_probability_percent,
+                    }
+                    for item in weather.forecast
+                ]
+                st.dataframe(rows, hide_index=True, use_container_width=True)
+                if not weather.forecast_available_for_trip:
+                    st.info(
+                        "Only part of this trip is currently inside the provider forecast window. "
+                        "Refresh closer to departure for the remaining dates."
+                    )
+            else:
+                st.info(
+                    "Your trip dates are outside the current forecast window. "
+                    "Current destination conditions are live; trip-date forecasts will appear closer to departure."
+                )
+        except LiveDataError as exc:
+            st.warning(f"Live weather is temporarily unavailable: {exc}")
+
+        st.markdown("#### Live exchange-rate reference")
+        quote_options = [currency for currency in CURRENCIES if currency != request.currency]
+        if quote_options:
+            preferred_quote = "INR" if request.currency != "INR" and "INR" in quote_options else "USD"
+            default_index = quote_options.index(preferred_quote) if preferred_quote in quote_options else 0
+            quote_currency = st.selectbox(
+                "Compare trip budget with",
+                quote_options,
+                index=default_index,
+                key=(
+                    f"live_fx_{request.destination}_{request.start_date.isoformat()}_"
+                    f"{request.end_date.isoformat()}_{request.currency}"
+                ),
+            )
+            try:
+                fx = _cached_exchange_rate(request.currency, quote_currency)
+                converted_budget = request.budget_amount * fx.rate
+                c1, c2 = st.columns(2)
+                c1.metric(
+                    f"1 {fx.base}",
+                    f"{fx.rate:,.4f} {fx.quote}",
+                )
+                c2.metric(
+                    "Budget equivalent",
+                    f"{converted_budget:,.2f} {fx.quote}",
+                )
+                st.caption(
+                    f"Latest available official-market reference date: {fx.rate_date}. "
+                    "This is a planning reference, not a card/cash conversion quote."
+                )
+            except LiveDataError as exc:
+                st.warning(f"Live exchange rate is temporarily unavailable: {exc}")
+
+
 def render_plan(request: TripRequest, plan: TripPlan) -> None:
     st.header(plan.trip_title)
     st.write(plan.overview)
@@ -139,6 +241,8 @@ def render_plan(request: TripRequest, plan: TripPlan) -> None:
 
     if plan.budget_note:
         st.info(plan.budget_note)
+
+    render_live_trip_data(request)
 
     tabs = st.tabs(["Day-by-day", "Budget", "Stay & food", "Travel notes", "Export"])
 

@@ -31,7 +31,9 @@ Instead of returning an unstructured wall of AI text, RouteMatrix validates Gemi
 - 🚇 **Local transport guidance** based on trip style and constraints
 - ♿ **Accessibility-aware planning** when accessibility needs are supplied
 - 🎒 **Packing, safety, local, and sustainability guidance**
-- 🗺️ **Google Maps / Hotels / Flights search shortcuts** for live verification
+- 🌦️ **Live destination weather** through Open-Meteo geocoding + current/forecast APIs
+- 💱 **Live exchange-rate reference** through Frankfurter's official-source currency API
+- 🗺️ **Google Maps / Hotels / Flights search shortcuts** for live booking verification
 - 📥 **Markdown, JSON, and `.ics` calendar exports**
 - ✅ **Input validation, schema validation, safe failure states, tests, linting, compile checks, and CI**
 - 🔑 **Environment / Streamlit secrets support** — no API keys in source code
@@ -74,9 +76,11 @@ flowchart LR
 │   ├── config.py         # environment / Streamlit secrets
 │   ├── database.py       # users, trips, revisions, expenses
 │   ├── exporters.py      # Markdown / JSON / ICS export utilities
+│   ├── live_data.py      # Open-Meteo weather + Frankfurter FX integrations
 │   ├── models.py         # Pydantic request / itinerary schemas
 │   └── ui.py             # reusable Streamlit UI/rendering
 ├── tests/
+├── scripts/live_api_smoke.py
 ├── .github/workflows/ci.yml
 ├── .streamlit/config.toml
 ├── requirements.txt
@@ -158,11 +162,13 @@ Every itinerary can be downloaded as:
 
 Activity map queries also link to Google Maps search, while destination-level shortcuts open Google Hotels and Google Flights/Travel so the traveler can verify current information externally.
 
-## ⚠️ Live Data Boundary
+## 🌐 Live Data & Boundaries
 
-RouteMatrix intentionally does **not** claim real-time prices, current weather, visa approval, opening hours, transport disruptions, or hotel/flight availability. AI-generated costs are estimates. Live information must be verified with the relevant provider before booking or travel.
+RouteMatrix now fetches **current destination weather and available trip-date forecasts from Open-Meteo** and **current reference exchange rates from Frankfurter**. These calls use bounded timeouts, retries, short Streamlit caches, response validation, and safe UI fallbacks so a temporary provider outage does not corrupt or block the saved itinerary.
 
-This design keeps the portfolio project technically honest while still demonstrating end-to-end AI product engineering.
+Hotel/flight availability, booking prices, visa approval, attraction opening hours, and transport disruptions are **not** fabricated as real-time data. The app opens external Google Travel/Hotels/Flights/Maps searches for those checks. AI-generated trip costs remain planning estimates and the FX rate is a reference rate rather than a card/cash conversion quote.
+
+This boundary keeps the portfolio project technically honest while still demonstrating end-to-end AI and live-data product engineering.
 
 ## 🧰 Tech Stack
 
@@ -173,6 +179,8 @@ This design keeps the portfolio project technically honest while still demonstra
 | Generative AI | Google Gemini API via `google-genai` |
 | Structured output | Pydantic |
 | Persistence | SQLite |
+| Live weather | Open-Meteo Geocoding + Forecast APIs |
+| Live FX | Frankfurter v2 exchange-rate API |
 | Data display | Pandas |
 | Secrets | Environment variables / Streamlit Secrets |
 | Security | `hashlib.scrypt` + random salts |
@@ -232,10 +240,11 @@ pip install -r requirements-dev.txt
 ruff check .
 pip-audit -r requirements.txt
 python -m pytest
+python -m scripts.live_api_smoke
 python -m compileall -q app.py routematrix
 ```
 
-Tests cover password hashing, email validation, authentication, user isolation, trip persistence, concurrent itinerary revision numbering, revision/restore behavior, expense persistence, defensive configuration parsing, model/date validation, Gemini timeout/retry and structured-output configuration, generation/refinement contracts, map URL generation, Markdown export, and ICS calendar export.
+Tests cover password hashing, email validation, authentication, user isolation, trip persistence, concurrent itinerary revision numbering, revision/restore behavior, expense persistence, defensive configuration parsing, model/date validation, Gemini timeout/retry and structured-output configuration, generation/refinement contracts, live weather/FX parsing and failure handling, map URL generation, Markdown export, and ICS calendar export. CI also performs a real network smoke check against Open-Meteo and Frankfurter on every qualifying push/PR.
 
 ## 🔒 Security & Reliability
 
@@ -248,6 +257,7 @@ Tests cover password hashing, email validation, authentication, user isolation, 
 - The AI system instruction treats user text as preferences rather than privileged instructions.
 - Failed AI generation/refinement leaves the currently saved trip unchanged.
 - Gemini requests have bounded timeouts and retries for transient provider failures.
-- Generated prices and travel information are explicitly labeled as estimates/planning guidance.
+- Live weather/FX calls use bounded retries, response validation, caching, and safe fallbacks.
+- Generated prices and non-live travel information are explicitly labeled as estimates/planning guidance.
 
 
