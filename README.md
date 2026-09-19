@@ -6,7 +6,7 @@
 ![Gemini](https://img.shields.io/badge/Google-Gemini_API-4285F4?logo=google&logoColor=fff)
 ![Pydantic](https://img.shields.io/badge/Pydantic-Structured_AI-E92063)
 
-RouteMatrix is a **production-oriented AI travel planning workspace** that turns a travel brief into a structured, budget-aware, day-by-day itinerary and then helps the traveler keep improving and managing that trip. It combines Google Gemini structured generation, authenticated saved trips, AI itinerary refinement with version history, practical budget planning, actual-expense tracking, travel search shortcuts, calendar/Markdown/JSON exports, tests, and CI.
+RouteMatrix is a **production-oriented AI travel planning workspace** that turns a travel brief into a structured, budget-aware, day-by-day itinerary and then helps the traveler keep improving and managing that trip. It combines Google Gemini structured generation, authenticated saved trips, AI itinerary refinement with version history, practical budget planning, actual-expense tracking, live destination weather and FX reference data, travel search shortcuts, calendar/Markdown/JSON exports, tests, and CI.
 
 Instead of returning an unstructured wall of AI text, RouteMatrix validates Gemini output against typed Pydantic models so the application can reliably render dates, activities, estimated costs, stay/food recommendations, transport guidance, packing lists, safety notes, sustainability guidance, and trip assumptions.
 
@@ -47,7 +47,7 @@ Instead of returning an unstructured wall of AI text, RouteMatrix validates Gemi
 5. RouteMatrix validates the response and renders day-by-day planning, budget, stay/food, travel notes, and export views.
 6. The itinerary is saved to the authenticated user's trip history as revision 1.
 7. The traveler can request natural-language AI refinements; every accepted update becomes a new reversible itinerary revision.
-8. The traveler can track real expenses against the planned budget, reopen trips, export them to Markdown/JSON/calendar, or use external live-search shortcuts before booking.
+8. The traveler can view live destination weather and FX reference data, track real expenses against the planned budget, reopen trips, export them to Markdown/JSON/calendar, or use external live-search shortcuts before booking.
 
 ## 🏗️ Architecture
 
@@ -62,6 +62,8 @@ flowchart LR
     DB --> TRIPS[Trips + Revisions]
     DB --> EXPENSES[Expense Tracker]
     UI --> EXPORT[Markdown / JSON / ICS]
+    UI --> WEATHER[Open-Meteo Weather]
+    UI --> FX[Frankfurter FX]
     UI --> LINKS[Maps / Hotels / Flights Search]
 ```
 
