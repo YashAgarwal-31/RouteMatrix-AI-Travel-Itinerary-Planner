@@ -13,7 +13,7 @@ load_dotenv()
 class Settings:
     app_name: str = "RouteMatrix"
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash-lite"
+    gemini_model: str = "gemini-3.8-flash"
     database_path: str = "data/routematrix.db"
     max_trip_days: int = 21
     gemini_timeout_ms: int = 60_000
@@ -41,7 +41,7 @@ def _bounded_int(name: str, default: int, minimum: int, maximum: int) -> int:
 
 def get_settings() -> Settings:
     api_key = os.getenv("GEMINI_API_KEY", "").strip() or _streamlit_secret("GEMINI_API_KEY")
-    model = os.getenv("GEMINI_MODEL", "").strip() or _streamlit_secret("GEMINI_MODEL") or "gemini-2.5-flash-lite"
+    model = os.getenv("GEMINI_MODEL", "").strip() or _streamlit_secret("GEMINI_MODEL") or "gemini-3.8-flash"
     database_path = os.getenv("ROUTEMATRIX_DB_PATH", "").strip() or "data/routematrix.db"
     return Settings(
         gemini_api_key=api_key,
@@ -55,3 +55,4 @@ def get_settings() -> Settings:
 
 def ensure_parent(path: str) -> None:
     Path(path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+
