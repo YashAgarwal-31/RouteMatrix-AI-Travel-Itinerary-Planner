@@ -235,7 +235,7 @@ Open `http://localhost:8501`.
 
 ## 🧪 Quality Gate
 
-GitHub Actions runs on `main`, feature branches, and pull requests:
+GitHub Actions runs on `main`, feature branches, pull requests, and manual dispatch:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -247,7 +247,7 @@ python -m scripts.gemini_api_smoke  # requires GEMINI_API_KEY
 python -m compileall -q app.py routematrix
 ```
 
-Tests cover password hashing, email validation, authentication, user isolation, trip persistence, concurrent itinerary revision numbering, revision/restore behavior, expense persistence, defensive configuration parsing, model/date validation, Gemini timeout/retry/capacity-fallback and structured-output configuration, generation/refinement contracts, live weather/FX parsing and failure handling, map URL generation, Markdown export, and ICS calendar export. CI also performs a real network smoke check against Open-Meteo and Frankfurter on every qualifying push/PR. When the repository Actions secret `GEMINI_API_KEY` is configured, CI also generates and schema-validates a real one-day Gemini itinerary. The Streamlit authentication screen is exercised with Streamlit's AppTest harness.
+Tests cover password hashing, email validation, authentication, user isolation, trip persistence, concurrent itinerary revision numbering, revision/restore behavior, expense persistence, defensive configuration parsing, model/date validation, Gemini timeout/retry/capacity-fallback and structured-output configuration, generation/refinement contracts, live weather/FX parsing and failure handling, map URL generation, Markdown export, and ICS calendar export. CI also performs a real network smoke check against Open-Meteo and Frankfurter on every qualifying push/PR. When the repository Actions secret `GEMINI_API_KEY` is configured, a manually dispatched CI run also generates and schema-validates a real one-day Gemini itinerary without consuming the free-tier quota on every repository push. The Streamlit authentication screen is exercised with Streamlit's AppTest harness.
 
 ## 🔒 Security & Reliability
 
@@ -281,5 +281,5 @@ python -m scripts.live_api_smoke
 python -m scripts.gemini_api_smoke
 ```
 
-The Gemini smoke test requires `GEMINI_API_KEY`. Add the same name as a GitHub Actions repository secret to enable the real Gemini call in CI. The smoke test validates the returned one-day itinerary schema and reports the model that completed the request. No provider credential is ever committed to the repository.
+The Gemini smoke test requires `GEMINI_API_KEY`. Add the same name as a GitHub Actions repository secret, then manually dispatch the CI workflow to run the real Gemini call without spending provider quota on every push. The smoke test validates the returned one-day itinerary schema and reports the model that completed the request. No provider credential is ever committed to the repository.
 
