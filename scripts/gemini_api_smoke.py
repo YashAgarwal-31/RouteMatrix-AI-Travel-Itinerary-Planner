@@ -26,19 +26,20 @@ def main() -> None:
         accommodation="Budget",
         additional_notes="Create a compact one-day portfolio smoke-test itinerary.",
     )
-    plan = GeminiPlanner(
+    planner = GeminiPlanner(
         settings.gemini_api_key,
         settings.gemini_model,
         timeout_ms=settings.gemini_timeout_ms,
         max_attempts=settings.gemini_max_attempts,
-    ).generate(request)
+    )
+    plan = planner.generate(request)
 
     if len(plan.days) != 1 or plan.days[0].date != today.isoformat():
         raise RuntimeError("Gemini smoke test returned an invalid itinerary contract.")
 
     print(
         "GEMINI_API_SMOKE_OK "
-        f"model={settings.gemini_model} "
+        f"model={planner.last_model_used} "
         f"destination={plan.destination} "
         f"activities={len(plan.days[0].activities)}"
     )

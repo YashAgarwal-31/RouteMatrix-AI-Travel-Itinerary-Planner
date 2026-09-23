@@ -143,3 +143,53 @@ def test_gemini_generation_rejects_empty_response(monkeypatch):
 
     with pytest.raises(RuntimeError, match="empty response"):
         GeminiPlanner("test-key", "test-model").generate(_request())
+
+
+def test_gemini_capacity_error_uses_fallback_model(monkeypatch):
+    calls = []
+
+    class CapacityError(Exception):
+        status_code = 503
+
+    def generate_content(**kwargs):
+        calls.append(kwargs["model"])
+        if len(calls) == 1:
+            raise CapacityError("503 UNAVAILABLE")
+        return SimpleNamespace(text=_plan().model_dump_json())
+
+    fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    monkeypatch.setattr("routematrix.ai.genai.Client", lambda **_kwargs: fake_client)
+
+    planner = GeminiPlanner(
+        "test-key",
+        "primary-model",
+        fallback_models=("fallback-model",),
+    )
+    result = planner.generate(_request())
+
+    assert result.trip_title == "Paris Explorer"
+    assert calls == ["primary-model", "fallback-model"]
+    assert planner.last_model_used == "fallback-model"
+
+
+def test_gemini_authentication_error_does_not_use_fallback(monkeypatch):
+    calls = []
+
+    class AuthenticationError(Exception):
+        status_code = 401
+
+    def generate_content(**kwargs):
+        calls.append(kwargs["model"])
+        raise AuthenticationError("invalid API key")
+
+    fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    monkeypatch.setattr("routematrix.ai.genai.Client", lambda **_kwargs: fake_client)
+
+    with pytest.raises(AuthenticationError):
+        GeminiPlanner(
+            "test-key",
+            "primary-model",
+            fallback_models=("fallback-model",),
+        ).generate(_request())
+
+    assert calls == ["primary-model"]
