@@ -95,8 +95,20 @@ def validate_plan_against_request(plan: TripPlan, request: TripRequest) -> TripP
     return plan
 
 
+def _is_temporary_capacity_error(error: Exception) -> bool:
+    status_code = getattr(error, "status_code", None) or getattr(error, "code", None)
+    return status_code == 503 or "503 UNAVAILABLE" in str(error).upper()
+
+
 class GeminiPlanner:
-    def __init__(self, api_key: str, model: str, timeout_ms: int = 60_000, max_attempts: int = 3) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        timeout_ms: int = 60_000,
+        max_attempts: int = 3,
+        fallback_models: tuple[str, ...] = ("gemini-3.5-flash-lite",),
+    ) -> None:
         if not api_key:
             raise ValueError("GEMINI_API_KEY is not configured.")
         timeout_ms = max(5_000, min(int(timeout_ms), 180_000))
@@ -116,19 +128,33 @@ class GeminiPlanner:
             ),
         )
         self.model = model
+        self.models = tuple(dict.fromkeys((model, *fallback_models)))
+        self.last_model_used = model
 
     def _generate_structured(self, prompt: str, request: TripRequest) -> TripPlan:
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_RULES,
-                temperature=0.35,
-                max_output_tokens=16000,
-                response_mime_type="application/json",
-                response_schema=TripPlan,
-            ),
-        )
+        response = None
+        for index, candidate_model in enumerate(self.models):
+            try:
+                response = self.client.models.generate_content(
+                    model=candidate_model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_RULES,
+                        temperature=0.35,
+                        max_output_tokens=16000,
+                        response_mime_type="application/json",
+                        response_schema=TripPlan,
+                    ),
+                )
+                self.last_model_used = candidate_model
+                break
+            except Exception as error:
+                has_fallback = index < len(self.models) - 1
+                if not has_fallback or not _is_temporary_capacity_error(error):
+                    raise
+
+        if response is None:
+            raise RuntimeError("Gemini did not return a response.")
         if not response.text:
             raise RuntimeError("Gemini returned an empty response.")
         try:
