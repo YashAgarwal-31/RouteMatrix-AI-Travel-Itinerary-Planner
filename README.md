@@ -243,10 +243,11 @@ ruff check .
 pip-audit -r requirements.txt
 python -m pytest
 python -m scripts.live_api_smoke
+python -m scripts.gemini_api_smoke  # requires GEMINI_API_KEY
 python -m compileall -q app.py routematrix
 ```
 
-Tests cover password hashing, email validation, authentication, user isolation, trip persistence, concurrent itinerary revision numbering, revision/restore behavior, expense persistence, defensive configuration parsing, model/date validation, Gemini timeout/retry and structured-output configuration, generation/refinement contracts, live weather/FX parsing and failure handling, map URL generation, Markdown export, and ICS calendar export. CI also performs a real network smoke check against Open-Meteo and Frankfurter on every qualifying push/PR. When the repository Actions secret `GEMINI_API_KEY` is configured, CI also generates and schema-validates a real one-day Gemini itinerary. The Streamlit authentication screen is exercised with Streamlit's AppTest harness.
+Tests cover password hashing, email validation, authentication, user isolation, trip persistence, concurrent itinerary revision numbering, revision/restore behavior, expense persistence, defensive configuration parsing, model/date validation, Gemini timeout/retry/capacity-fallback and structured-output configuration, generation/refinement contracts, live weather/FX parsing and failure handling, map URL generation, Markdown export, and ICS calendar export. CI also performs a real network smoke check against Open-Meteo and Frankfurter on every qualifying push/PR. When the repository Actions secret `GEMINI_API_KEY` is configured, CI also generates and schema-validates a real one-day Gemini itinerary. The Streamlit authentication screen is exercised with Streamlit's AppTest harness.
 
 ## 🔒 Security & Reliability
 
@@ -258,7 +259,7 @@ Tests cover password hashing, email validation, authentication, user isolation, 
 - Gemini output is schema-validated before rendering or persistence.
 - The AI system instruction treats user text as preferences rather than privileged instructions.
 - Failed AI generation/refinement leaves the currently saved trip unchanged.
-- Gemini requests have bounded timeouts and retries for transient provider failures.
+- Gemini requests have bounded timeouts and retries; a provider-side 503 capacity failure on `gemini-3.8-flash` uses the compatible `gemini-3.5-flash-lite` fallback without hiding authentication errors.
 - Live weather/FX calls use bounded retries, response validation, caching, and safe fallbacks.
 - Generated prices and non-live travel information are explicitly labeled as estimates/planning guidance.
 
@@ -269,7 +270,7 @@ Tests cover password hashing, email validation, authentication, user isolation, 
 
 RouteMatrix uses live provider calls rather than hard-coded weather or exchange-rate values:
 
-- **Google Gemini:** structured itinerary generation and refinement using `gemini-3.8-flash`
+- **Google Gemini:** structured itinerary generation and refinement using `gemini-3.8-flash`, with `gemini-3.5-flash-lite` as a 503-capacity fallback
 - **Open-Meteo:** destination geocoding, current conditions, and forecast data
 - **Frankfurter:** current official-source exchange-rate reference data
 
@@ -280,5 +281,5 @@ python -m scripts.live_api_smoke
 python -m scripts.gemini_api_smoke
 ```
 
-The Gemini smoke test requires `GEMINI_API_KEY`. Add the same name as a GitHub Actions repository secret to enable the real Gemini call in CI. No provider credential is ever committed to the repository.
+The Gemini smoke test requires `GEMINI_API_KEY`. Add the same name as a GitHub Actions repository secret to enable the real Gemini call in CI. The smoke test validates the returned one-day itinerary schema and reports the model that completed the request. No provider credential is ever committed to the repository.
 
