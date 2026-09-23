@@ -52,9 +52,38 @@ def test_trip_request_days_and_export():
     assert "BEGIN:VCALENDAR" in calendar
     assert "SUMMARY:Fushimi Inari" in calendar
     assert "DTSTART:20261001T090000" in calendar
+    uid_line = next(line for line in calendar.splitlines() if line.startswith("UID:"))
+    assert uid_line.endswith("@routematrix.app")
+    assert plan_to_ics(plan) == calendar
     assert calendar.endswith("END:VCALENDAR\r\n")
 
 
 def test_map_url_encodes_query():
     url = map_search_url("India Gate New Delhi")
     assert "India+Gate+New+Delhi" in url
+
+
+def test_calendar_event_ids_do_not_collide_between_trips():
+    first = TripPlan(
+        destination="Kyoto, Japan",
+        trip_title="Kyoto Highlights",
+        overview="First itinerary.",
+        currency="INR",
+        estimated_total_cost=1000,
+        days=[
+            DayPlan(
+                day=1,
+                date="2026-10-01",
+                theme="Kyoto",
+                summary="Explore Kyoto.",
+                activities=[Activity(time="09:00", name="Morning Walk", description="Walk.", map_query="Kyoto")],
+            )
+        ],
+    )
+    second = first.model_copy(update={"destination": "Tokyo, Japan", "trip_title": "Tokyo Highlights"})
+
+    first_uid = next(line for line in plan_to_ics(first).splitlines() if line.startswith("UID:"))
+    second_uid = next(line for line in plan_to_ics(second).splitlines() if line.startswith("UID:"))
+
+    assert first_uid != second_uid
+

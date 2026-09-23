@@ -8,7 +8,7 @@ Create a Gemini API key and keep it outside Git. RouteMatrix reads the key from 
 
 ```toml
 GEMINI_API_KEY = "your-key"
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_MODEL = "gemini-3.8-flash"
 ```
 
 Never commit `.streamlit/secrets.toml` or `.env`.
@@ -57,7 +57,7 @@ Before sharing the live URL:
 
 ## 5. AI/live-data checks
 
-CI runs both mocked contract tests and `python -m scripts.live_api_smoke`, which performs real outbound requests to Open-Meteo and Frankfurter. Use several real destinations and confirm that:
+CI runs mocked contract tests, a Streamlit AppTest startup check, and `python -m scripts.live_api_smoke`, which performs real outbound requests to Open-Meteo and Frankfurter. Configure a GitHub Actions repository secret named `GEMINI_API_KEY` to also run `python -m scripts.gemini_api_smoke` against the real Gemini API. Use several real destinations and confirm that:
 
 - The AI returns exactly the requested number of days.
 - The itinerary does not claim guaranteed current prices, hotel/flight availability, weather, visa approval, or opening hours.
@@ -75,3 +75,4 @@ CI runs both mocked contract tests and `python -m scripts.live_api_smoke`, which
 - Do not store payment information, passport/identity documents, or highly sensitive personal information in this demo architecture.
 - Generated recommendations are planning guidance, not guarantees of price, safety, availability, visa rules, weather, or opening hours.
 - For a larger public deployment, add managed identity, a managed database, rate limiting, monitoring/alerts, backups, and a privacy/data-retention policy.
+

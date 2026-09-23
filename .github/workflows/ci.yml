@@ -15,6 +15,8 @@ permissions:
 jobs:
   python:
     runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -29,7 +31,15 @@ jobs:
         run: pip-audit -r requirements.txt
       - name: Tests
         run: python -m pytest
-      - name: Live API smoke
+      - name: Live weather and FX API smoke
         run: python -m scripts.live_api_smoke
+      - name: Live Gemini API smoke
+        if: ${{ env.GEMINI_API_KEY != '' }}
+        env:
+          GEMINI_MODEL: gemini-3.8-flash
+        run: python -m scripts.gemini_api_smoke
+      - name: Report missing Gemini smoke credential
+        if: ${{ env.GEMINI_API_KEY == '' }}
+        run: echo "::warning::GEMINI_API_KEY secret is not configured; live Gemini smoke was skipped."
       - name: Compile
         run: python -m compileall -q app.py routematrix

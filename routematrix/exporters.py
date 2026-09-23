@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timedelta
 from urllib.parse import quote_plus
 
@@ -102,10 +103,22 @@ def plan_to_ics(plan: TripPlan) -> str:
             description = activity.description
             if activity.tips:
                 description += " Tips: " + " | ".join(activity.tips)
+            uid_seed = "|".join(
+                [
+                    plan.destination,
+                    plan.trip_title,
+                    day.date,
+                    str(event_number),
+                    activity.time,
+                    activity.name,
+                    activity.map_query,
+                ]
+            )
+            event_uid = uuid.uuid5(uuid.NAMESPACE_URL, uid_seed)
             lines.extend(
                 [
                     "BEGIN:VEVENT",
-                    f"UID:routematrix-{day.day}-{event_number}@local",
+                    f"UID:{event_uid}@routematrix.app",
                     f"DTSTART:{start.strftime('%Y%m%dT%H%M%S')}",
                     f"DTEND:{end.strftime('%Y%m%dT%H%M%S')}",
                     f"SUMMARY:{_ics_escape(activity.name)}",
@@ -116,3 +129,4 @@ def plan_to_ics(plan: TripPlan) -> str:
             )
     lines.append("END:VCALENDAR")
     return "\r\n".join(lines) + "\r\n"
+
